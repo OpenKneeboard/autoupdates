@@ -2,6 +2,7 @@
 param(
   [switch] $Preview = $false,
   [switch] $Stable = $false,
+  [switch] $Force = $false,
   [Parameter()]
   [string] $GithubToken
 )
@@ -16,6 +17,7 @@ if ("${GithubToken}" -ne "") {
 # All releases, in version order
 $AllReleases = (Invoke-WebRequest -URI https://api.github.com/repos/OpenKneeboard/OpenKneeboard/releases -Headers $Headers).Content
 | ConvertFrom-Json
+| ForEach-Object { $_.html_url = "https://openkneeboard.com/changelog/#$($_.tag_name)"; $_ }
 | Sort-Object -Descending -Property { [System.Management.Automation.SemanticVersion] ($_.tag_name -replace '^v' -replace 'beta','beta.') }
 
 function Get-Update-Version($object) {
@@ -28,7 +30,11 @@ function Write-Update-File-If-Changed($File, $NewData) {
   Write-Host -NoNewline "[$((Get-Item $File).BaseName)] ${OldVersion} -> ${NewVersion}: "
   if ($OldVersion -eq $NewVersion) {
     Write-Host "no change."
-    return
+    if ($Force) {
+      Write-Host "FORCE: continuing anyway"
+    } else {
+      return
+    }
   }
   Write-Host "UPDATING"
   $NewData | ConvertTo-Json -Depth 8 -AsArray | Out-File -Encoding utf8NoBOM -FilePath $File
